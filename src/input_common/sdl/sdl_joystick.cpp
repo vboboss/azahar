@@ -21,10 +21,20 @@ void SDLJoystick::CalibrateJoystickAxes() {
         return;
     const int num_axes = SDL_JoystickNumAxes(sdl_joystick.get());
     for (int axis = 0; axis < num_axes; ++axis) {
-        // assume the joystick is approximately centered at start.
-        // maybe not a great assumption but the best we've got.
+        // Calibrate joystick axis centers at initialization
+        // This accounts for analog stick drift and ensures proper dead zone handling
+        // Assume the joystick is approximately centered at start.
         const auto raw = SDL_JoystickGetAxis(sdl_joystick.get(), axis);
-        joystick_axis_centers[axis] = raw > 28000 ? 32767 : (raw < -28000 ? -32768 : 0);
+
+        // Set center point: if axis is near extremes, assume centered at that position
+        // Otherwise assume center at 0 (neutral position)
+        if (raw > 28000) {
+            joystick_axis_centers[axis] = 32767;  // Right/up extreme
+        } else if (raw < -28000) {
+            joystick_axis_centers[axis] = -32768; // Left/down extreme
+        } else {
+            joystick_axis_centers[axis] = 0;      // Neutral
+        }
     }
 }
 
