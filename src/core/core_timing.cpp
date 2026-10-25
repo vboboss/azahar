@@ -116,8 +116,22 @@ void Timing::UnscheduleEvent(const TimingEventType* event_type, std::uintptr_t u
             timer->event_queue.erase(itr, timer->event_queue.end());
             std::make_heap(timer->event_queue.begin(), timer->event_queue.end(), std::greater<>());
         }
+
+        // Remove events from ts_queue to prevent memory leak
+        // The ts_queue is a thread-safe queue used for cross-thread event scheduling
+        // We need to drain it and re-add only the events we want to keep
+        std::vector<Event> temp_events;
+        Event event;
+        while (timer->ts_queue.TryPop(event)) {
+            if (!(event.type == event_type && event.user_data == user_data)) {
+                temp_events.push_back(event);
+            }
+        }
+        // Re-add the events we kept
+        for (const auto& e : temp_events) {
+            timer->ts_queue.Push(e);
+        }
     }
-    // TODO:remove events from ts_queue
 }
 
 void Timing::RemoveEvent(const TimingEventType* event_type) {
@@ -133,8 +147,21 @@ void Timing::RemoveEvent(const TimingEventType* event_type) {
             timer->event_queue.erase(itr, timer->event_queue.end());
             std::make_heap(timer->event_queue.begin(), timer->event_queue.end(), std::greater<>());
         }
+
+        // Remove events from ts_queue to prevent memory leak
+        // Safely drain the thread-safe queue and re-add only events we want to keep
+        std::vector<Event> temp_events;
+        Event event;
+        while (timer->ts_queue.TryPop(event)) {
+            if (event.type != event_type) {
+                temp_events.push_back(event);
+            }
+        }
+        // Re-add the events we kept
+        for (const auto& e : temp_events) {
+            timer->ts_queue.Push(e);
+        }
     }
-    // TODO:remove events from ts_queue
 }
 
 void Timing::SetCurrentTimer(std::size_t core_id) {
